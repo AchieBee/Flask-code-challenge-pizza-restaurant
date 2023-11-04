@@ -1,8 +1,8 @@
-"""empty message
+"""Add price column to pizzas
 
-Revision ID: 99874360d1d7
+Revision ID: 06c05879376a
 Revises: 
-Create Date: 2023-10-30 16:03:37.627756
+Create Date: 2023-11-04 15:24:11.407700
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '99874360d1d7'
+revision = '06c05879376a'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -24,12 +24,14 @@ def upgrade():
     sa.Column('ingredients', sa.String(length=200), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
+    sa.Column('price', sa.Float(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('restaurants',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('address', sa.String(length=200), nullable=False),
+    sa.Column('phone_number', sa.String(length=20), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('restaurant_pizzas',

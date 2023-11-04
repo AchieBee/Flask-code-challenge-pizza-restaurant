@@ -9,6 +9,7 @@ class Restaurant(db.Model):
     name = db.Column(db.String(100), nullable=False)
     address = db.Column(db.String(200), nullable=False)
     restaurant_pizzas = db.relationship('RestaurantPizza', backref='restaurant', cascade='all, delete-orphan')
+    phone_number = db.Column(db.String(20))
 
 class Pizza(db.Model):
     __tablename__ = 'pizzas'
@@ -19,6 +20,7 @@ class Pizza(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, onupdate=db.func.now()) 
     restaurant_pizzas = db.relationship('RestaurantPizza', backref='pizza', cascade='all, delete-orphan')
+    price = db.Column(db.Float)
 
 class RestaurantPizza(db.Model):
     __tablename__ = 'restaurant_pizzas'

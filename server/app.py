@@ -1,148 +1,94 @@
-from flask import Flask, request, make_response, jsonify
-from flask_migrate import Migrate
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask
+from flask_restful import Api, Resource, reqparse, fields, marshal_with
+from models import db, Restaurant, Pizza, RestaurantPizza
 
-
-from models import db, Restaurant, RestaurantPizza, Pizza
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-migrate = Migrate(app, db)
-
 db.init_app(app)
 
-@app.route('/restaurants', methods=['GET'])
-def get_restaurants():
-    restaurant_list = []
+api = Api(app)
 
-    restaurants = Restaurant.query.all()
-    for restaurant in restaurants:
-        restaurant_data = {
-            'id': restaurant.id,
-            'name': restaurant.name,
-            'address': restaurant.address
-        }
-        restaurant_list.append(restaurant_data)
+class Welcome(Resource):
+    def get(self):
+        return {'message': 'Welcome Home'}
 
-    response=make_response(
-        jsonify(restaurant_list),
-        201
-    )
+# Define the request parser for restaurant data
+restaurant_parser = reqparse.RequestParser()
+restaurant_parser.add_argument('name', type=str, required=True, help='Name is required')
+restaurant_parser.add_argument('address', type=str, required=True, help='Address is required')
 
-    return response
+# Define the request parser for pizza data
+pizza_parser = reqparse.RequestParser()
+pizza_parser.add_argument('name', type=str, required=True, help='Name is required')
+pizza_parser.add_argument('ingredients', type=str, required=True, help='Ingredients are required')
+pizza_parser.add_argument('price', type=float, required=True, help='Price is required')
 
+# Define a resource for listing and creating restaurants
+class RestaurantList(Resource):
+    @marshal_with({'id': fields.Integer, 'name': fields.String, 'address': fields.String})
+    def get(self):
+        restaurants = Restaurant.query.all()
+        return restaurants
 
+    @marshal_with({'id': fields.Integer, 'name': fields.String, 'address': fields.String})
+    def post(self):
+        args = restaurant_parser.parse_args()
+        restaurant = Restaurant(name=args['name'], address=args['address'])
+        db.session.add(restaurant)
+        db.session.commit()
+        return restaurant, 201
 
-@app.route('/restaurants/<int:id>', methods=['GET'])
-def get_restaurant(id):
-    restaurant = Restaurant.query.get(id)
+# Define a resource for individual restaurants
+class RestaurantResource(Resource):
+    @marshal_with({'id': fields.Integer, 'name': fields.String, 'address': fields.String})
+    def get(self, id):
+        restaurant = Restaurant.query.get(id)
+        if not restaurant:
+            return {'error': 'Restaurant not found'}, 404
+        return restaurant
 
-    if restaurant is None:
-        return jsonify({'error': 'Restaurant not found'}), 404
+    @marshal_with({'message': fields.String})
+    def put(self, id):
+        args = restaurant_parser.parse_args()
+        restaurant = Restaurant.query.get(id)
+        if not restaurant:
+            return {'error': 'Restaurant not found'}, 404
+        restaurant.name = args['name']
+        restaurant.address = args['address']
+        db.session.commit()
+        return {'message': 'Restaurant has been updated'}, 200
 
-    pizzas = []
-    for restaurant_pizza in restaurant.pizzas:
-        pizza = restaurant_pizza.pizza
-        pizza_data = {
-            'id': pizza.id,
-            'name': pizza.name,
-            'ingredients': pizza.ingredients
-        }
-        pizzas.append(pizza_data)
+    @marshal_with({'message': fields.String})
+    def delete(self, id):
+        restaurant = Restaurant.query.get(id)
+        if not restaurant:
+            return {'error': 'Restaurant not found'}, 404
+        db.session.delete(restaurant)
+        db.session.commit()
+        return '', 204
 
-    restaurant_data = {
-        'id': restaurant.id,
-        'name': restaurant.name,
-        'address': restaurant.address,
-        'pizzas': pizzas
-    }
+# Define a resource for listing and creating pizzas
+class PizzaList(Resource):
+    @marshal_with({'id': fields.Integer, 'name': fields.String, 'ingredients': fields.String, 'price': fields.Float})
+    def get(self):
+        pizzas = Pizza.query.all()
+        return pizzas
 
-    return jsonify(restaurant_data)
+    @marshal_with({'id': fields.Integer, 'name': fields.String, 'ingredients': fields.String, 'price': fields.Float})
+    def post(self):
+        args = pizza_parser.parse_args()
+        pizza = Pizza(name=args['name'], ingredients=args['ingredients'], price=args['price'])
+        db.session.add(pizza)
+        db.session.commit()
+        return pizza, 201
 
-
-@app.route('/restaurants', methods=['POST'])
-def newrestaurant():
-    data = request.get_json()
-
-    name = data.get('name')
-    address = data.get('address')
-
-    if not name or not address:
-        return jsonify({'errors': ['Missing required data']}), 400
-
-    restaurant = Restaurant(name=name, address=address)
-    db.session.add(restaurant)
-    db.session.commit()
-
-    newrestaurantdata = {
-        'id': restaurant.id,
-        'name': restaurant.name,
-        'address': restaurant.address
-    }
-    response=make_response(
-        jsonify(newrestaurantdata),
-        201
-    )
-
-    return response
-
-@app.route('/restaurants/<int:id>', methods=['PUT'])
-def update_restaurant(id):
-    data = request.get_json()
-
-    name = data.get('name')
-    address = data.get('address')
-
-    restaurant = Restaurant.query.get(id)
-
-    if restaurant is None:
-        return jsonify({'error': 'Restaurant not found'}), 404
-
-    if name is not None:
-        restaurant.name = name
-
-    if address is not None:
-        restaurant.address = address
-
-    db.session.commit()
-
-    response= make_response(
-        jsonify({'message': 'Restaurant has been updated'}),200
-    )
-    return response
-
-    
-
-
-@app.route('/restaurants/<int:id>', methods=['DELETE'])
-def remove_restaurant(id):
-    restaurant = Restaurant.query.get(id)
-
-    if restaurant is None:
-        return jsonify({'error': 'Restaurant not found'}), 404
-
-    db.session.delete(restaurant)
-    db.session.commit()
-
-    return '', 204
-
-
-@app.route('/pizzas', methods=['GET'])
-def get_pizzas():
-    pizzas = Pizza.query.all()
-    pizza_list = []
-
-    for pizza in pizzas:
-        pizza_data = {
-            'id': pizza.id,
-            'name': pizza.name,
-            'ingredients': pizza.ingredients
-        }
-        pizza_list.append(pizza_data)
-
-    return jsonify(pizza_list), 200
-    
+# Add resources to the API
+api.add_resource(Welcome, '/')
+api.add_resource(RestaurantList, '/restaurants')
+api.add_resource(RestaurantResource, '/restaurants/<int:id>')
+api.add_resource(PizzaList, '/pizzas')
 
 if __name__ == '__main__':
-   app.run(debug=True, port=5555)
+    db.create_all()
+    app.run(debug=True, port=5555)
